@@ -2,12 +2,13 @@ import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/shared/services/prisma.service'
 import { RegisterBodyType, VerificationCodeType } from './auth.model'
 import { UserType } from 'src/shared/models/shared-user.model'
+import { TypeOfVerificationCodeType } from 'src/shared/constants/auth.constant'
 @Injectable()
 export class AuthRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
   async createUser(
-    data: Omit<RegisterBodyType, 'confirmPassword'> & Pick<UserType, 'roleId'>,
+    data: Omit<RegisterBodyType, 'confirmPassword' | 'code'> & Pick<UserType, 'roleId'>,
   ): Promise<Omit<UserType, 'password' | 'totpSecret'>> {
     // const existing = await this.prismaService.user.findFirst({
     //   where: {
@@ -47,6 +48,18 @@ export class AuthRepository {
         code: payload.code,
         expiresAt: payload.expiresAt,
       },
+    })
+  }
+
+  async findVerificationCode(
+    payload: { email: string } | { id: number} | {
+      email: string
+      type: TypeOfVerificationCodeType
+      code: string
+    },
+  ): Promise<VerificationCodeType> {
+    return this.prismaService.verificationCode.findFirst({
+      where: payload,
     })
   }
 }
