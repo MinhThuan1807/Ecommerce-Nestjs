@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from 'src/shared/services/prisma.service'
-import { RegisterBodyType, VerificationCodeType } from './auth.model'
+import { DeviceType, RefreshTokenType, RegisterBodyType, RoleType, VerificationCodeType } from './auth.model'
 import { UserType } from 'src/shared/models/shared-user.model'
 import { TypeOfVerificationCodeType } from 'src/shared/constants/auth.constant'
 @Injectable()
@@ -10,20 +10,6 @@ export class AuthRepository {
   async createUser(
     data: Omit<RegisterBodyType, 'confirmPassword' | 'code'> & Pick<UserType, 'roleId'>,
   ): Promise<Omit<UserType, 'password' | 'totpSecret'>> {
-    // const existing = await this.prismaService.user.findFirst({
-    //   where: {
-    //     OR: [{ email: data.email }, { phoneNumber: data.phoneNumber }],
-    //   },
-    // })
-
-    // if (existing) {
-    //   if (existing.email === data.email) {
-    //     throw new ConflictException('Email already exists')
-    //   }
-    //   if (existing.phoneNumber === data.phoneNumber) {
-    //     throw new ConflictException('Phone number already exists')
-    //   }
-    // }
     return this.prismaService.user.create({
       data: data,
       omit: {
@@ -52,14 +38,85 @@ export class AuthRepository {
   }
 
   async findVerificationCode(
-    payload: { email: string } | { id: number} | {
-      email: string
-      type: TypeOfVerificationCodeType
-      code: string
-    },
+    payload:
+      | { email: string }
+      | { id: number }
+      | {
+          email: string
+          type: TypeOfVerificationCodeType
+          code: string
+        },
   ): Promise<VerificationCodeType> {
     return this.prismaService.verificationCode.findFirst({
       where: payload,
     })
   }
+
+  createDevice(
+    data: Pick<DeviceType, 'userId' | 'userAgent' | 'ip'> & Partial<Pick<DeviceType, 'lastActive' | 'isActive'>>,
+  ) {
+    {
+      return this.prismaService.device.create({
+        data,
+      })
+    }
+  }
+
+  async findUniqueIncludeRole(
+    uniqueObject: { email: string } | { id: number },
+  ): Promise<(UserType & { role: RoleType }) | null> {
+    return this.prismaService.user.findFirst({
+      where: uniqueObject,
+      include: {
+        role: true,
+      },
+    })
+  }
+
+  async findRefreshTokenIncludeUserRole(uniqueObject: { token: string }): Promise<RefreshTokenType & { user: UserType & { role: RoleType }} | null> {
+    return this.prismaService.refreshToken.findUnique({
+      where: uniqueObject,
+      include: {
+        user: {
+          include: {
+            role: true,
+          }
+        }
+      },
+    })
+  }
+
+  async updateDeviceLastActive(deviceId: number, userAgent: string, ip: string) {
+    return await this.prismaService.device.update({
+      where: {
+        id: deviceId,
+      },
+      data: {
+        lastActive: new Date(),
+        userAgent,
+        ip,
+      },
+    })
+  }
+
+  async updateDeviceId(deviceId: number, data: Partial<DeviceType>) {
+    return await this.prismaService.device.update({
+      where: {
+        id: deviceId,
+      },
+      data: {
+        lastActive: new Date(),
+        ...data,
+      },
+    })
+  }
+
+  async deleteRefreshToken(token: string) {
+    return await this.prismaService.refreshToken.delete({
+      where: {
+        token,
+      },
+    })
+  }
 }
+  
